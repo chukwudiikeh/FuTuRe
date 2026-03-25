@@ -6,15 +6,16 @@ import { validateAmount, formatAmount } from './utils/validateAmount';
 import { getFriendlyError } from './utils/errorMessages';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
+import { useMessages } from './hooks/useMessages';
 import { makeVariants, tapScale } from './utils/animations';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { QRCodeModal } from './components/QRCodeModal';
 import { NetworkBadge } from './components/NetworkBadge';
+import { StatusMessage } from './components/StatusMessage';
 import { logError } from './utils/errorLogger';
 
 const STATUS_COLORS = { connected: '#22c55e', disconnected: '#ef4444', reconnecting: '#f59e0b' };
 
-// Spinner for loading state
 function Spinner() {
   return (
     <motion.span
@@ -30,32 +31,22 @@ function App() {
   const [balance, setBalance] = useState(null);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
-  const [status, setStatus] = useState(null);
-  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState('');
   const [showQR, setShowQR] = useState(false);
+
+  const msg = useMessages();
 
   const prefersReduced = useReducedMotion();
   const v = makeVariants(prefersReduced);
   const tap = tapScale(prefersReduced);
 
-  const setError = (error, retry) => setStatus({ type: 'error', message: getFriendlyError(error), retry });
-  const setSuccess = (message) => setStatus({ type: 'success', message });
-
-  const addNotification = (msg) => {
-    const note = {
-      id: Date.now(),
-      text: msg.direction === 'received'
-        ? `📥 Received ${msg.amount} ${msg.assetCode} — tx: ${msg.hash?.slice(0, 8)}…`
-        : `📤 Sent ${msg.amount} ${msg.assetCode} — tx: ${msg.hash?.slice(0, 8)}…`
-    };
-    setNotifications((prev) => [note, ...prev].slice(0, 5));
-  };
-
-  const handleWsMessage = (msg) => {
-    if (msg.type === 'transaction') {
-      addNotification(msg);
-      if (msg.balance) setBalance((prev) => prev ? { ...prev, balances: msg.balance } : null);
+  const handleWsMessage = (wsMsg) => {
+    if (wsMsg.type === 'transaction') {
+      const text = wsMsg.direction === 'received'
+        ? `📥 Received ${wsMsg.amount} ${wsMsg.assetCode} — tx: ${wsMsg.hash?.slice(0, 8)}…`
+        : `📤 Sent ${wsMsg.amount} ${wsMsg.assetCode} — tx: ${wsMsg.hash?.slice(0, 8)}…`;
+      msg.info(text);
+      if (wsMsg.balance) setBalance((prev) => prev ? { ...prev, balances: wsMsg.balance } : null);
     }
   };
 
@@ -67,10 +58,10 @@ function App() {
     try {
       const { data } = await axios.post('/api/stellar/account/create');
       setAccount(data);
-      setSuccess('Account created! Save your secret key securely.');
+      msg.success('Account created! Save your secret key securely.');
     } catch (error) {
       logError(error, { context: 'createAccount' });
-      setError(error, createAccount);
+      msg.error(getFriendlyError(error), { retry: createAccount });
     } finally { setLoading(''); }
   };
 
@@ -82,7 +73,7 @@ function App() {
       setBalance(data);
     } catch (error) {
       logError(error, { context: 'checkBalance' });
-      setError(error, checkBalance);
+      msg.error(getFriendlyError(error), { retry: checkBalance });
     } finally { setLoading(''); }
   };
 
@@ -103,11 +94,11 @@ function App() {
         amount,
         assetCode: 'XLM'
       });
-      setSuccess(`Payment sent! Hash: ${data.hash}`);
+      msg.success(`Payment sent! Hash: ${data.hash}`);
       checkBalance();
     } catch (error) {
       logError(error, { context: 'sendPayment' });
-      setError(error, sendPayment);
+      msg.error(getFriendlyError(error), { retry: sendPayment });
     } finally { setLoading(''); }
   };
 
@@ -214,50 +205,22 @@ function App() {
               </ErrorBoundary>
             </motion.div>
 
-            {/* Live Notifications */}
-            <AnimatePresence>
-              {notifications.length > 0 && (
-                <motion.div className="section" variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
-                  <h3>Live Notifications</h3>
-                  <AnimatePresence initial={false}>
-                    {notifications.map((n) => (
-                      <motion.div
-                        key={n.id}
-                        className="status-banner success"
-                        variants={v.pop}
-                        initial="hidden" animate="visible" exit="exit"
-                        style={{ marginBottom: 6 }}
-                        drag="x"
-                        dragConstraints={{ left: 0, right: 0 }}
-                        onDragEnd={(_, info) => {
-                          if (Math.abs(info.offset.x) > 80)
-                            setNotifications((prev) => prev.filter((x) => x.id !== n.id));
-                        }}
-                      >
-                        <span>{n.text}</span>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Status Banner */}
+      {/* Status Messages */}
+      <StatusMessage
+        messages={msg.messages}
+        history={msg.history}
+        onRemove={msg.remove}
+        showHistory={true}
+      />
+
+      {/* QR Code Modal */}
       <AnimatePresence>
-        {status && (
-          <motion.div
-            className={`status-banner ${status.type}`}
-            variants={v.pop}
-            initial="hidden" animate="visible" exit="exit"
-          >
-            <span>{status.type === 'error' ? '⚠️' : '✅'}</span>
-            <span className="msg">{status.message}</span>
-            {status.retry && <motion.button onClick={status.retry} {...tap}>Retry</motion.button>}
-          </motion.div>
+        {showQR && account && (
+          <QRCodeModal publicKey={account.publicKey} onClose={() => setShowQR(false)} />
         )}
       </AnimatePresence>
 
