@@ -1,5 +1,6 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
 import dotenv from 'dotenv';
+import { eventMonitor } from '../eventSourcing/index.js';
 
 dotenv.config();
 
@@ -8,25 +9,45 @@ const isTestnet = process.env.STELLAR_NETWORK === 'testnet';
 
 export async function createAccount() {
   const pair = StellarSDK.Keypair.random();
+  const publicKey = pair.publicKey();
   
   if (isTestnet) {
-    await fetch(`https://friendbot.stellar.org?addr=${pair.publicKey()}`);
+    await fetch(`https://friendbot.stellar.org?addr=${publicKey}`);
+    await eventMonitor.publishEvent(publicKey, {
+      type: 'AccountFunded',
+      data: { publicKey },
+      version: 1
+    });
   }
+
+  await eventMonitor.publishEvent(publicKey, {
+    type: 'AccountCreated',
+    data: { publicKey, secretKey: pair.secret() },
+    version: 1
+  });
   
   return {
-    publicKey: pair.publicKey(),
+    publicKey,
     secretKey: pair.secret()
   };
 }
 
 export async function getBalance(publicKey) {
   const account = await server.loadAccount(publicKey);
+  const balances = account.balances.map(b => ({
+    asset: b.asset_type === 'native' ? 'XLM' : `${b.asset_code}:${b.asset_issuer}`,
+    balance: b.balance
+  }));
+
+  await eventMonitor.publishEvent(publicKey, {
+    type: 'BalanceChecked',
+    data: { balances },
+    version: 1
+  });
+
   return {
     publicKey,
-    balances: account.balances.map(b => ({
-      asset: b.asset_type === 'native' ? 'XLM' : `${b.asset_code}:${b.asset_issuer}`,
-      balance: b.balance
-    }))
+    balances
   };
 }
 
@@ -54,6 +75,12 @@ export async function sendPayment(sourceSecret, destination, amount, assetCode =
   
   transaction.sign(sourceKeypair);
   const result = await server.submitTransaction(transaction);
+
+  await eventMonitor.publishEvent(sourceKeypair.publicKey(), {
+    type: 'PaymentSent',
+    data: { destination, amount, hash: result.hash },
+    version: 1
+  });
   
   return {
     hash: result.hash,

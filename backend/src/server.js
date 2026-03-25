@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
+import stellarRoutes from './routes/stellar.js';
+import eventsRoutes from './routes/events.js';
+import { eventMonitor } from './eventSourcing/index.js';
 
 dotenv.config();
 
@@ -12,10 +15,14 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Initialize event sourcing
+await eventMonitor.initialize();
+
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use('/api/stellar', stellarRoutes);
+app.use('/api/events', eventsRoutes);
 
 /**
  * @swagger
