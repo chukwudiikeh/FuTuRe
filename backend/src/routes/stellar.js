@@ -1,6 +1,7 @@
 import express from 'express';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import * as StellarService from '../services/stellar.js';
+import { getRate, getAllRates, convert } from '../services/exchangeRate.js';
 import { broadcastToAccount } from '../services/websocket.js';
 import { validate, rules } from '../middleware/validate.js';
 import { SUPPORTED_ASSETS, getIssuer } from '../config/assets.js';
@@ -165,8 +166,31 @@ router.post('/payment/send', rules.sendPayment, validate, async (req, res) => {
  */
 router.get('/exchange-rate/:from/:to', rules.assetCodeParams, validate, async (req, res) => {
   try {
-    const rate = await StellarService.getExchangeRate(req.params.from, req.params.to);
-    res.json({ rate });
+    const { from, to } = req.params;
+    const rate = await getRate(from, to);
+    res.json({ from, to, rate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// All supported pair rates in one call
+router.get('/rates', async (req, res) => {
+  try {
+    const rates = await getAllRates();
+    res.json({ rates });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Convert an amount between assets
+router.get('/convert/:from/:to/:amount', rules.assetCodeParams, validate, async (req, res) => {
+  try {
+    const amount = parseFloat(req.params.amount);
+    if (!isFinite(amount) || amount <= 0) return res.status(422).json({ error: 'Invalid amount' });
+    const result = await convert(amount, req.params.from, req.params.to);
+    res.json({ from: req.params.from, to: req.params.to, amount, converted: result });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
