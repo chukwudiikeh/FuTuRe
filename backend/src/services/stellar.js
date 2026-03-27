@@ -1,5 +1,6 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { eventMonitor } from '../eventSourcing/index.js';
+import { getConfig } from '../config/env.js';
 import logger from '../config/logger.js';
 
 let horizonServerUrl;
