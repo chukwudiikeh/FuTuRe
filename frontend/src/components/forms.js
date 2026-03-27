@@ -5,3 +5,9 @@ export { AddressBook } from './AddressBook.jsx';
 export { DatePicker } from './DatePicker.jsx';
 export { SearchableSelect } from './SearchableSelect.jsx';
 export { FormWizard } from './FormWizard.jsx';
+
+// Security components
+export { SecurityKeyWarning, SecretKeyDisplay } from './SecurityKeyWarning.jsx';
+export { LargeTransactionWarning, TransactionReviewCard } from './LargeTransactionWarning.jsx';
+export { SecurityBestPracticesModal } from './SecurityBestPracticesModal.jsx';
+export { NetworkWarning, NetworkStatus } from './NetworkWarning.jsx';

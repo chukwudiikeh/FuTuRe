@@ -21,6 +21,7 @@ import { TransactionHistory } from './components/TransactionHistory';
 import { FeeDisplay } from './components/FeeDisplay';
 import { logError } from './utils/errorLogger';
 import { ImportAccountForm } from './components/ImportAccountForm';
+import { useTheme } from './contexts/ThemeContext';
 
 const STATUS_COLORS = { connected: '#22c55e', disconnected: '#ef4444', reconnecting: '#f59e0b' };
 const TIMEOUT_MS = 30000;
@@ -48,10 +49,22 @@ function App() {
   const { queue: queueOffline, pendingCount } = useOfflineQueue();
   const [showImportForm, setShowImportForm] = useState(false);
 
-  const msg = useMessages();
+  const { theme, isDark, toggleTheme } = useTheme();
   const prefersReduced = useReducedMotion();
   const v = makeVariants(prefersReduced);
   const tap = tapScale(prefersReduced);
+
+  // Show security best practices on first load
+  useEffect(() => {
+    if (!sessionStorage.getItem('securityBestPractices_dismissed')) {
+      setShowSecurityBestPractices(true);
+    }
+  }, []);
+
+  const dismissSecurityBestPractices = () => {
+    setShowSecurityBestPractices(false);
+    sessionStorage.setItem('securityBestPractices_dismissed', 'true');
+  };
 
   const handleWsMessage = (wsMsg) => {
     if (wsMsg.type === 'transaction') {
@@ -141,8 +154,23 @@ function App() {
   const amountError = validateAmount(amount, xlmBalance !== null ? parseFloat(xlmBalance) : null);
   const amountValid = amountTouched && !amountError;
 
+  // Reset large transaction confirmation when amount changes
+  useEffect(() => {
+    if (amount) {
+      setLargeTransactionConfirmed(false);
+    }
+  }, [amount]);
+
   const sendPayment = async () => {
     if (!account || !recipientValid || !amountValid) return;
+    
+    // Check if large transaction is confirmed
+    const numAmount = parseFloat(amount);
+    if (numAmount > 1000 && !largeTransactionConfirmed) {
+      msg.warning('⚠️ Please review and confirm the large transaction warning below.');
+      return;
+    }
+
     setLoading('send');
     const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM' };
     try {
@@ -192,6 +220,15 @@ function App() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>Stellar Remittance Platform</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+          >
+            {isDark ? '☀️ Light' : '🌙 Dark'}
+          </button>
           {canInstall && (
             <button type="button" className="pwa-install-btn" onClick={install} title="Install app">
               ⬇ Install

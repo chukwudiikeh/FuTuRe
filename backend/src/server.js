@@ -18,6 +18,7 @@ import chaosRoutes from './routes/chaos.js';
 import mobileRoutes from './routes/mobile.js';
 import webhookRoutes from './routes/webhooks.js';
 import metricsRoutes from './routes/metrics.js';
+import transactionRoutes from './routes/transactions.js';
 import { eventMonitor } from './eventSourcing/index.js';
 import { auditLogger } from './security/index.js';
 import { getConfig } from './config/env.js';
@@ -67,6 +68,7 @@ app.use('/api/chaos', chaosRoutes);
 app.use('/api/mobile', mobileRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/metrics', metricsRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 app.get('/health', async (req, res) => {
   const db = await checkDBHealth();

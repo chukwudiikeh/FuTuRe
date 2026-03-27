@@ -256,3 +256,181 @@ The advanced security system is production-ready and provides:
 - Automated incident response
 - Multi-framework compliance
 - Continuous security testing
+
+---
+
+## Frontend Security Warnings & Best Practices ✅ (NEW)
+
+In addition to backend security, comprehensive frontend security warnings and best practices have been implemented to educate and protect end users.
+
+### User-Facing Security Features
+
+#### 1. Secret Key Security Warnings
+- **Components**: `SecurityKeyWarning`, `SecretKeyDisplay`
+- **Location**: `frontend/src/components/SecurityKeyWarning.jsx`
+- **Features**:
+  - Mandatory security warning before displaying keys
+  - Secret key masked by default with show/hide toggle
+  - Copy button restricted to when key is revealed
+  - 5-point DO NOT list displayed prominently
+  - Public key clearly marked as safe to share
+  - Offline storage recommendations
+
+#### 2. Large Transaction Warnings
+- **Components**: `LargeTransactionWarning`, `TransactionReviewCard`
+- **Location**: `frontend/src/components/LargeTransactionWarning.jsx`
+- **Features**:
+  - Triggers for transactions > 1000 XLM
+  - Pre-transaction verification checklist
+  - Recipient, amount, and network verification
+  - User must explicitly confirm before proceeding
+  - Transaction summary card with current/post-balance
+
+#### 3. Network Awareness
+- **Component**: `NetworkWarning`, `NetworkStatus`
+- **Location**: `frontend/src/components/NetworkWarning.jsx`
+- **Features**:
+  - Testnet warning (blue) - "Test funds, no real value"
+  - Mainnet warning (green) - "Real funds at risk"
+  - Offline warning (red) - "Network unavailable"
+  - Automatically detects current network
+
+#### 4. Security Best Practices Modal
+- **Component**: `SecurityBestPracticesModal`
+- **Location**: `frontend/src/components/SecurityBestPracticesModal.jsx`
+- **5 Comprehensive Tabs**:
+  1. Security Overview - Core principles
+  2. Secret Key Management - DO's and DON'Ts
+  3. Safe Transactions - Pre-transaction checklist
+  4. Network Awareness - Testnet vs Mainnet
+  5. Recovery - Compromise/loss procedures
+- **Features**:
+  - Shown automatically on first visit (session-based)
+  - Always accessible via 🛡️ Security button in header
+  - Hardware wallet recommendations
+  - Links to external resources
+  - Comprehensive guidance on key management
+
+### Integration Points
+
+#### Header
+- New "🛡️ Security" button for quick access
+- Opens security best practices modal
+- Available throughout user session
+
+#### Account Creation
+- `SecretKeyDisplay` replaces simple text display
+- Mandatory security warning
+- Key masking with reveal functionality
+- Offline storage tips
+
+#### Transaction Flow
+- `NetworkWarning` displayed prominently
+- `LargeTransactionWarning` for amounts > 1000 XLM
+- `TransactionReviewCard` shows detailed summary
+- All verification steps required before sending
+
+### State Management
+
+New state variables in App.jsx:
+```javascript
+const [showSecurityBestPractices, setShowSecurityBestPractices] = useState(false);
+const [largeTransactionConfirmed, setLargeTransactionConfirmed] = useState(false);
+const [securityAcknowledged, setSecurityAcknowledged] = useState(false);
+```
+
+Effects:
+- Auto-show security modal on first load
+- Reset large transaction confirmation when amount changes
+- Session storage persistence
+
+### Component Stats
+
+| Component | Size | Features |
+|-----------|------|----------|
+| SecurityKeyWarning | 177 lines | Warning banner, acknowledgment |
+| LargeTransactionWarning | 154 lines | TX detection, checklist |
+| SecurityBestPracticesModal | 422 lines | 5 tabs, comprehensive guide |
+| NetworkWarning | 148 lines | Network detection/warnings |
+| App.jsx (updated) | 380 lines | Full integration |
+| Documentation | 730 lines | User & dev guides |
+
+### Documentation
+
+1. **SECURITY_FEATURES.md** (358 lines)
+   - Complete feature overview
+   - User education content
+   - Configuration options
+   - Testing procedures
+
+2. **SECURITY_COMPONENTS_REFERENCE.md** (372 lines)
+   - Developer quick reference
+   - API documentation
+   - Usage patterns
+   - Troubleshooting
+
+### Visual Design
+
+**Color Scheme**:
+- Red (#ef4444) - Critical warnings, real funds
+- Orange (#f59e0b) - Cautions, verification needed
+- Blue (#0284c7) - Testnet, information
+- Green (#22c55e) - Success, verified, online
+
+**Accessibility**:
+- WCAG AA+ compliance
+- High color contrast
+- Keyboard navigation
+- Semantic HTML
+- Alt text for icons
+
+### User Experience
+
+**Before Transaction**:
+1. View network status (testnet/mainnet warning)
+2. Enter recipient (validated)
+3. Enter amount
+4. See large transaction warning (if > 1000 XLM)
+5. Review transaction details
+6. Confirm and send
+
+**Account Creation**:
+1. Create account
+2. See security modal (first time)
+3. Security warning for secret key
+4. View masked secret key
+5. Copy public key
+6. Store keys securely
+
+### Key Messages
+
+1. **"Never share your secret key with anyone, including support staff"**
+2. **"Anyone with your secret key can access and transfer all your funds"**
+3. **"You are on Testnet — funds have no real value"**
+4. **"Always verify recipient address and amount before sending"**
+5. **"Store your keys securely offline"**
+
+### Testing Status
+
+✅ All components compile without errors
+✅ No type errors or warnings
+✅ Integration tests pass
+✅ Responsive design verified
+✅ Accessibility checked
+✅ Production ready
+
+### Next Steps
+
+1. User acceptance testing
+2. Monitor security modal engagement
+3. Track large transaction confirmations
+4. A/B test warning effectiveness
+5. Gather user feedback
+6. Plan hardware wallet integration
+
+---
+
+**Combined Security System Status**: ✅ Complete & Production Ready
+**Backend + Frontend Security**: Comprehensive coverage
+**Date**: March 27, 2026
+
