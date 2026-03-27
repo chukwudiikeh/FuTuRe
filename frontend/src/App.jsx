@@ -16,18 +16,22 @@ import { QRCodeModal } from './components/QRCodeModal';
 import { NetworkBadge } from './components/NetworkBadge';
 import { StatusMessage } from './components/StatusMessage';
 import { CopyButton } from './components/CopyButton';
+import { Spinner } from './components/Spinner';
+import { TransactionHistory } from './components/TransactionHistory';
+import { FeeDisplay } from './components/FeeDisplay';
 import { logError } from './utils/errorLogger';
+import { ImportAccountForm } from './components/ImportAccountForm';
 
 const STATUS_COLORS = { connected: '#22c55e', disconnected: '#ef4444', reconnecting: '#f59e0b' };
+const TIMEOUT_MS = 30000;
 
-function Spinner() {
-  return (
-    <motion.span
-      animate={{ rotate: 360 }}
-      transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }}
-      style={{ display: 'inline-block', marginLeft: 8 }}
-    >⟳</motion.span>
-  );
+function withTimeout(promise) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out. Please try again.')), TIMEOUT_MS)
+    ),
+  ]);
 }
 
 function App() {
@@ -42,7 +46,9 @@ function App() {
   const msg = useMessages();
   const { canInstall, install, updateAvailable, applyUpdate } = usePWA();
   const { queue: queueOffline, pendingCount } = useOfflineQueue();
+  const [showImportForm, setShowImportForm] = useState(false);
 
+  const msg = useMessages();
   const prefersReduced = useReducedMotion();
   const v = makeVariants(prefersReduced);
   const tap = tapScale(prefersReduced);
@@ -83,12 +89,19 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
+  const resetForm = () => { setRecipient(''); setAmount(''); };
+
+  const clearForm = () => {
+    if ((recipient || amount) && !window.confirm('Clear the payment form?')) return;
+    resetForm();
+  };
 
   const createAccount = async () => {
     setLoading('create');
     try {
-      const { data } = await axios.post('/api/stellar/account/create');
+      const { data } = await withTimeout(axios.post('/api/stellar/account/create'));
       setAccount(data);
+      resetForm();
       msg.success('Account created! Save your secret key securely.');
     } catch (error) {
       logError(error, { context: 'createAccount' });
@@ -96,11 +109,24 @@ function App() {
     } finally { setLoading(''); }
   };
 
+  const importAccount = async (secretKey) => {
+    setLoading('import');
+    try {
+      const { data } = await axios.post('/api/stellar/account/import', { secretKey });
+      setAccount(data);
+      setShowImportForm(false);
+      msg.success('Account imported successfully!');
+    } catch (error) {
+      logError(error, { context: 'importAccount' });
+      msg.error(getFriendlyError(error));
+    } finally { setLoading(''); }
+  };
+
   const checkBalance = async () => {
     if (!account) return;
     setLoading('balance');
     try {
-      const { data } = await axios.get(`/api/stellar/account/${account.publicKey}`);
+      const { data } = await withTimeout(axios.get(`/api/stellar/account/${account.publicKey}`));
       setBalance(data);
     } catch (error) {
       logError(error, { context: 'checkBalance' });
@@ -121,7 +147,14 @@ function App() {
     const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM' };
     try {
       const { data } = await axios.post('/api/stellar/payment/send', payload);
+      const { data } = await withTimeout(axios.post('/api/stellar/payment/send', {
+        sourceSecret: account.secretKey,
+        destination: recipient,
+        amount,
+        assetCode: 'XLM'
+      }));
       msg.success(`Payment sent! Hash: ${data.hash}`);
+      resetForm();
       checkBalance();
     } catch (error) {
       // If offline, queue for background sync
@@ -209,6 +242,27 @@ function App() {
       <motion.div className="section" variants={v.fadeSlide} initial="hidden" animate="visible">
         <motion.button onClick={createAccount} {...tap} disabled={loading === 'create'} title="Create account (Ctrl+N)">
           Create Account {loading === 'create' && <Spinner />}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <motion.button onClick={createAccount} {...tap} disabled={loading === 'create'}>
+            Create Account {loading === 'create' && <Spinner />}
+          </motion.button>
+          <motion.button
+            onClick={() => setShowImportForm((v) => !v)}
+            {...tap}
+            style={{ background: '#6366f1' }}
+          >
+            {showImportForm ? 'Cancel Import' : 'Import Account'}
+          </motion.button>
+        </div>
+        <AnimatePresence>
+          {showImportForm && (
+            <motion.div variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
+              <ImportAccountForm onImport={importAccount} loading={loading} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <motion.button onClick={createAccount} {...tap} disabled={loading === 'create'}>
+          {loading === 'create' ? <Spinner label="Creating account..." /> : 'Create Account'}
         </motion.button>
         <AnimatePresence>
           {account && (
@@ -242,7 +296,7 @@ function App() {
             {/* Balance */}
             <motion.div className="section" variants={v.fadeSlide}>
               <motion.button onClick={checkBalance} {...tap} disabled={loading === 'balance'}>
-                Check Balance {loading === 'balance' && <Spinner />}
+                {loading === 'balance' ? <Spinner label="Checking balance..." /> : 'Check Balance'}
               </motion.button>
               <AnimatePresence>
                 {balance && (
@@ -300,10 +354,26 @@ function App() {
                   </motion.p>
                 )}
               </AnimatePresence>
-              <motion.button onClick={sendPayment} {...tap} disabled={!recipientValid || !amountValid || loading === 'send'}>
-                Send {loading === 'send' && <Spinner />}
-              </motion.button>
+              <FeeDisplay amount={amount} visible={amountValid} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <motion.button onClick={sendPayment} {...tap} disabled={!recipientValid || !amountValid || loading === 'send'}>
+                  {loading === 'send' ? <Spinner label="Sending payment..." /> : 'Send'}
+                </motion.button>
+                <motion.button
+                  className="btn-clear"
+                  onClick={clearForm}
+                  {...tap}
+                  disabled={loading === 'send' || (!recipient && !amount)}
+                >
+                  Clear
+                </motion.button>
+              </div>
               </ErrorBoundary>
+            </motion.div>
+
+            {/* Transaction History */}
+            <motion.div variants={v.fadeSlide}>
+              <TransactionHistory publicKey={account.publicKey} />
             </motion.div>
 
           </motion.div>
