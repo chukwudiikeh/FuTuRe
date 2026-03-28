@@ -17,7 +17,9 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:parallel": "vitest run --workers 4",
-    "test:mobile": "cd mobile-tests && node run-tests.js"
+    "test:mobile": "cd mobile-tests && node run-tests.js",
+    "test:property": "vitest run --config vitest.property.config.js",
+    "test:property:watch": "vitest --config vitest.property.config.js"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",
@@ -25,6 +27,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/ui": "4.1.1",
     "concurrently": "^8.2.2",
+    "fast-check": "^4.6.0",
     "jsdom": "29.0.1",
     "supertest": "^7.2.2",
     "vitest": "4.1.1"
