@@ -7,45 +7,38 @@ datasource db {
 }
 
 model User {
-  id                      String                   @id @default(uuid())
-  publicKey               String                   @unique
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  settings                Setting?
-  sentTxs                 Transaction[]            @relation("sender")
-  receivedTxs             Transaction[]            @relation("recipient")
-  notifications           Notification[]
-  notificationPreference  NotificationPreference?
-  id           String        @id @default(uuid())
-  publicKey    String        @unique
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  settings     Setting?
-  sentTxs          Transaction[]   @relation("sender")
-  receivedTxs      Transaction[]   @relation("recipient")
-  sentStreams      PaymentStream[] @relation("streamSender")
-  receivedStreams  PaymentStream[] @relation("streamRecipient")
-  kycRecord    KYCRecord?
-  sentTxs      Transaction[] @relation("sender")
-  receivedTxs  Transaction[] @relation("recipient")
+  id                     String                  @id @default(uuid())
+  publicKey              String                  @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  settings               Setting?
+  sentTxs                Transaction[]           @relation("sender")
+  receivedTxs            Transaction[]           @relation("recipient")
+  sentStreams             PaymentStream[]         @relation("streamSender")
+  receivedStreams         PaymentStream[]         @relation("streamRecipient")
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  kycRecord              KYCRecord?
+  amlAlerts              AMLAlert[]
 }
 
 model Transaction {
-  id            String          @id @default(uuid())
-  hash          String          @unique
-  assetCode     String          @default("XLM")
+  id            String         @id @default(uuid())
+  hash          String         @unique
+  assetCode     String         @default("XLM")
   amount        Decimal
   ledger        Int?
-  successful    Boolean         @default(true)
-  createdAt     DateTime        @default(now())
+  successful    Boolean        @default(true)
+  createdAt     DateTime       @default(now())
   senderId      String
-  sender        User            @relation("sender",    fields: [senderId],    references: [id])
+  sender        User           @relation("sender", fields: [senderId], references: [id])
   recipientId   String
-  recipient     User            @relation("recipient", fields: [recipientId], references: [id])
-  retryAttempts Int             @default(0)
+  recipient     User           @relation("recipient", fields: [recipientId], references: [id])
+  retryAttempts Int            @default(0)
   retryStatus   String?
   lastRetryAt   DateTime?
   retryHistory  RetryAttempt[]
+  amlAlerts     AMLAlert[]
 }
 
 model RetryAttempt {
@@ -59,12 +52,12 @@ model RetryAttempt {
 }
 
 model Setting {
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  defaultAsset      String   @default("XLM")
-  notificationsOn   Boolean  @default(true)
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultAsset    String   @default("XLM")
+  notificationsOn Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
 }
 
 enum StreamStatus {
@@ -82,17 +75,19 @@ model PaymentStream {
   recipientId     String
   recipient       User         @relation("streamRecipient", fields: [recipientId], references: [id])
   assetCode       String       @default("XLM")
-  rateAmount      Decimal      // amount to stream per interval
+  rateAmount      Decimal
   intervalSeconds Int          @default(60)
   startTime       DateTime     @default(now())
   endTime         DateTime?
   lastProcessedAt DateTime     @default(now())
-  totalStreamed   Decimal      @default(0)
+  totalStreamed    Decimal      @default(0)
   status          StreamStatus @default(ACTIVE)
   failureCount    Int          @default(0)
   metadata        Json?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+}
+
 model Notification {
   id        String   @id @default(uuid())
   userId    String
@@ -111,22 +106,24 @@ model Notification {
 }
 
 model NotificationPreference {
-  id               String   @id @default(uuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emailEnabled     Boolean  @default(true)
-  pushEnabled      Boolean  @default(true)
-  smsEnabled       Boolean  @default(false)
-  inAppEnabled     Boolean  @default(true)
-  quietHoursStart  Int      @default(22)
-  quietHoursEnd    Int      @default(7)
-  typeOverrides    Json?
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailEnabled    Boolean  @default(true)
+  pushEnabled     Boolean  @default(true)
+  smsEnabled      Boolean  @default(false)
+  inAppEnabled    Boolean  @default(true)
+  quietHoursStart Int      @default(22)
+  quietHoursEnd   Int      @default(7)
+  typeOverrides   Json?
+  updatedAt       DateTime @updatedAt
+}
+
 model KYCRecord {
   id             String   @id @default(uuid())
   userId         String   @unique
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status         String   @default("PENDING")  // PENDING | APPROVED | REJECTED | UNDER_REVIEW
+  status         String   @default("PENDING")
   fullName       String
   dateOfBirth    String
   nationality    String
@@ -142,13 +139,15 @@ model KYCRecord {
 }
 
 model AMLAlert {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
   userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Restrict)
   ruleId        String
   severity      String
   description   String
   riskScore     Int
   riskLevel     String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
 }
