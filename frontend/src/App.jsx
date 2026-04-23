@@ -154,11 +154,12 @@ function App() {
     setLoading('send');
     const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM' };
 
-    // Optimistic balance update
+    // Optimistic balance update (deduct amount + base fee to match on-chain deduction)
+    const BASE_FEE_XLM = 0.00001;
     const numAmount = parseFloat(amount);
     if (xlmBalance !== null) {
       const optimisticBalances = balance.balances.map(b =>
-        b.asset === 'XLM' ? { ...b, balance: String((parseFloat(b.balance) - numAmount).toFixed(7)) } : b
+        b.asset === 'XLM' ? { ...b, balance: String((parseFloat(b.balance) - numAmount - BASE_FEE_XLM).toFixed(7)) } : b
       );
       dispatch({ type: A.SET_BALANCE_OPTIMISTIC, payload: { balances: optimisticBalances } });
     }
