@@ -40,6 +40,23 @@ router.post('/', streamRules.create, validate, async (req, res) => {
   }
 });
 
+router.get('/', async (req, res) => {
+  try {
+    const { senderPublicKey } = req.query;
+    const where = senderPublicKey
+      ? { sender: { publicKey: senderPublicKey } }
+      : {};
+    const streams = await StreamingService.prisma.paymentStream.findMany({
+      where,
+      include: { sender: true, recipient: true },
+      orderBy: { startTime: 'desc' },
+    });
+    res.json(streams);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/analytics', async (req, res) => {
   try {
     const analytics = await StreamingService.getStreamAnalytics();

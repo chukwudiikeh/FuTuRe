@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useEffect, useCallback, useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { isValidStellarAddress } from './utils/validateStellarAddress';
@@ -15,11 +14,13 @@ import { useRTL } from './hooks/useRTL';
 import { makeVariants, tapScale } from './utils/animations';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { QRCodeModal } from './components/QRCodeModal';
+import { QRScanner } from './components/QRScanner';
 import { NetworkBadge } from './components/NetworkBadge';
 import { StatusMessage } from './components/StatusMessage';
 import { CopyButton } from './components/CopyButton';
 import { Spinner } from './components/Spinner';
 import { TransactionHistory } from './components/TransactionHistory';
+import { StreamPayment } from './components/StreamPayment';
 import { FeeDisplay } from './components/FeeDisplay';
 import { InlineConfirmation } from './components/InlineConfirmation';
 import { logError } from './utils/errorLogger';
@@ -55,14 +56,14 @@ function App() {
   const { account, balance, loading, recipient, amount, showQR, showImportForm, showShortcuts, accountLabel } = useAppState();
   const { account, balance, loading, recipient, amount, memo, memoType, showQR, showImportForm, showShortcuts } = useAppState();
   const [showConfirm, setShowConfirm] = useState(false);
-  const { account, balance, loading, recipient, amount, showQR, showImportForm, showShortcuts } = useAppState();
+  const [showScanner, setShowScanner] = useState(false);
   const dispatch = useAppDispatch();
 
   // Local state not in store
-  const [memo, setMemo] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
   const [replaySecret, setReplaySecret] = useState('');
   const [showReplayPrompt, setShowReplayPrompt] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const msg = useMessages();
   const { canInstall, install, updateAvailable, applyUpdate } = usePWA();
@@ -239,8 +240,6 @@ function App() {
   const sendPayment = async () => {
     if (!account || !recipientValid || !amountValid) return;
     dispatch({ type: A.SET_LOADING, payload: 'send' });
-    const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM', memo: memo || undefined };
-    setLoading('send');
     const payload = { sourceSecret: account.secretKey, destination: recipient, amount, assetCode: 'XLM', memo: memo || undefined, memoType: memo ? memoType : undefined };
 
     // Optimistic balance update
@@ -631,15 +630,33 @@ function App() {
                         value={recipient}
                         onChange={(e) => dispatch({ type: A.SET_RECIPIENT, payload: e.target.value })}
                         onKeyDown={(e) => e.key === 'Enter' && sendPayment()}
-                        onChange={(e) => setRecipient(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && setShowConfirm(true)}
                         style={{ border: `2px solid ${recipientTouched ? (recipientValid ? '#22c55e' : '#ef4444') : '#ccc'}` }}
                         aria-invalid={recipientTouched && !recipientValid}
                         aria-describedby={recipientTouched && !recipientValid ? 'recipient-error' : undefined}
                         autoComplete="off"
                       />
                       {recipientTouched && <span className="input-icon" aria-hidden="true">{recipientValid ? '✅' : '❌'}</span>}
+                      <button
+                        type="button"
+                        className="qr-scan-btn"
+                        onClick={() => setShowScanner(true)}
+                        aria-label="Scan QR code to fill recipient address"
+                        title="Scan QR"
+                      >
+                        📷
+                      </button>
                     </div>
+                    <AnimatePresence>
+                      {showScanner && (
+                        <QRScanner
+                          onScan={(address) => {
+                            dispatch({ type: A.SET_RECIPIENT, payload: address });
+                            setShowScanner(false);
+                          }}
+                          onClose={() => setShowScanner(false)}
+                        />
+                      )}
+                    </AnimatePresence>
                     <AnimatePresence>
                       {recipientTouched && !recipientValid && (
                         <motion.p id="recipient-error" className="field-error" role="alert" variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
@@ -658,8 +675,6 @@ function App() {
                         value={amount}
                         onChange={(e) => dispatch({ type: A.SET_AMOUNT, payload: formatAmount(e.target.value) })}
                         onKeyDown={(e) => e.key === 'Enter' && sendPayment()}
-                        onChange={(e) => setAmount(formatAmount(e.target.value))}
-                        onKeyDown={(e) => e.key === 'Enter' && setShowConfirm(true)}
                         style={{ border: `2px solid ${amountTouched ? (amountValid ? '#22c55e' : '#ef4444') : '#ccc'}` }}
                         aria-invalid={amountTouched && !!amountError}
                         aria-describedby={amountTouched && amountError ? 'amount-error' : undefined}
@@ -715,10 +730,6 @@ function App() {
                         onKeyDown={(e) => e.key === 'Enter' && sendPayment()}
                         aria-label={memoType === 'id' ? 'Numeric memo ID for exchange deposit' : 'Payment memo (optional)'}
                         maxLength={memoType === 'id' ? 20 : 28}
-                        onChange={(e) => setMemo(e.target.value.slice(0, 28))}
-                        onKeyDown={(e) => e.key === 'Enter' && setShowConfirm(true)}
-                        aria-label="Payment memo (optional)"
-                        maxLength="28"
                       />
                       {memo && memoType === 'text' && <span className="input-icon" aria-hidden="true">{memo.length}/28</span>}
                     </div>
@@ -766,6 +777,11 @@ function App() {
                 {/* Transaction History */}
                 <motion.div variants={v.fadeSlide}>
                   <TransactionHistory publicKey={account.publicKey} />
+                </motion.div>
+
+                {/* Stream Payments */}
+                <motion.div variants={v.fadeSlide}>
+                  <StreamPayment publicKey={account.publicKey} />
                 </motion.div>
 
               </motion.div>

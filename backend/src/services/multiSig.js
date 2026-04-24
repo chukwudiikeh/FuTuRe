@@ -94,6 +94,7 @@ export async function buildMultiSigTransaction(sourcePublicKey, destination, amo
 
   const txXdr = transaction.toXDR();
   const txId = `multisig-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
   await prisma.pendingMultiSigTx.create({
     data: {
@@ -105,6 +106,7 @@ export async function buildMultiSigTransaction(sourcePublicKey, destination, amo
       assetCode,
       signatures: [],
       status: 'pending',
+      expiresAt,
     },
   });
 
@@ -124,6 +126,7 @@ export async function addSignature(txId, signerSecret) {
   const pending = await prisma.pendingMultiSigTx.findUnique({ where: { txId } });
   if (!pending) throw new Error(`Transaction ${txId} not found`);
   if (pending.status !== 'pending') throw new Error(`Transaction ${txId} is already ${pending.status}`);
+  if (pending.expiresAt <= new Date()) throw new Error(`Transaction ${txId} has expired`);
 
   const signerKeypair = StellarSDK.Keypair.fromSecret(signerSecret);
   const signerPublicKey = signerKeypair.publicKey();
@@ -167,6 +170,7 @@ export async function submitMultiSigTransaction(txId) {
   const pending = await prisma.pendingMultiSigTx.findUnique({ where: { txId } });
   if (!pending) throw new Error(`Transaction ${txId} not found`);
   if (pending.status !== 'pending') throw new Error(`Transaction ${txId} is already ${pending.status}`);
+  if (pending.expiresAt <= new Date()) throw new Error(`Transaction ${txId} has expired`);
 
   const transaction = StellarSDK.TransactionBuilder.fromXDR(pending.txXdr, networkPassphrase);
   const result = await getHorizonServer().submitTransaction(transaction);
@@ -317,4 +321,15 @@ export async function getPendingTransactions(sourcePublicKey) {
  */
 export async function getPendingTransaction(txId) {
   return prisma.pendingMultiSigTx.findUnique({ where: { txId } });
+}
+
+/**
+ * Mark all pending transactions past their expiresAt as 'expired'.
+ */
+export async function expireStaleTransactions() {
+  const { count } = await prisma.pendingMultiSigTx.updateMany({
+    where: { status: 'pending', expiresAt: { lte: new Date() } },
+    data: { status: 'expired' },
+  });
+  return count;
 }

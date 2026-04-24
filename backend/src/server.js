@@ -9,6 +9,7 @@ import { connectDB, checkDBHealth } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
 import stellarRoutes from './routes/stellar.js';
 import multiSigRoutes from './routes/multiSig.js';
+import { expireStaleTransactions } from './services/multiSig.js';
 import authRoutes from './routes/auth.js';
 import { initWebSocket } from './services/websocket.js';
 import eventsRoutes from './routes/events.js';
@@ -154,5 +155,14 @@ httpServer.listen(PORT, () => {
       logger.error('streaming.worker.failed', { error: err.message });
     }
   }, STREAM_INTERVAL);
+  // Expire stale multi-sig transactions every minute
+  setInterval(async () => {
+    try {
+      const count = await expireStaleTransactions();
+      if (count > 0) logger.info('multisig.expired', { count });
+    } catch (err) {
+      logger.error('multisig.expiry.failed', { error: err.message });
+    }
+  }, 60 * 1000);
   startScheduler();
 });

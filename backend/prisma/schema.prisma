@@ -166,6 +166,9 @@ model PendingMultiSigTx {
   assetCode       String   @default("XLM")
   signatures      Json     @default("[]")
   status          String   @default("pending")
+  expiresAt       DateTime
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([status, expiresAt])
 }

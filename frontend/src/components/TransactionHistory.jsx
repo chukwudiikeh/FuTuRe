@@ -100,7 +100,6 @@ export function TransactionHistory({ publicKey }) {
   const [error, setError] = useState(null);
 
   const MAX_CURSOR_HISTORY = 50;
-  const [cursors, setCursors] = useState([]);
 
   const fetchPage = useCallback(async (cursor = null, isBack = false) => {
     setLoading(true);
@@ -127,9 +126,6 @@ export function TransactionHistory({ publicKey }) {
     } finally {
       setLoading(false);
     }
-      if (!isBack && cursor) setCursors(prev => [...prev, cursor]);
-    } catch { /* errors handled by parent */ }
-    finally { setLoading(false); }
   }, [publicKey, filters]);
 
   const handleLoad = () => { setCursors([]); fetchPage(null); };
