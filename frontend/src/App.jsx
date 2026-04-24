@@ -84,6 +84,10 @@ function App() {
         e.preventDefault();
         if (loading !== 'create') createAccount();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        if (loading !== 'balance') checkBalance();
+      }
       if (e.key === 'Escape') {
         dispatch({ type: A.SET_SHOW_QR, payload: false });
         dispatch({ type: A.SET_SHOW_SHORTCUTS, payload: false });
@@ -332,6 +336,7 @@ function App() {
             </div>
             <ul className="shortcuts-list">
               <li><kbd>Ctrl+N</kbd> Create new account</li>
+              <li><kbd>Ctrl+B</kbd> Check balance</li>
               <li><kbd>Ctrl+C</kbd> Copy key (when copy button focused)</li>
               <li><kbd>Escape</kbd> Close modals</li>
               <li><kbd>?</kbd> Toggle this help</li>
@@ -456,6 +461,7 @@ function App() {
               </div>
               <ul className="shortcuts-list">
                 <li><kbd>Ctrl+N</kbd> Create new account</li>
+                <li><kbd>Ctrl+B</kbd> Check balance</li>
                 <li><kbd>Ctrl+C</kbd> Copy key (when copy button focused)</li>
                 <li><kbd>Escape</kbd> Close modals</li>
                 <li><kbd>?</kbd> Toggle this help</li>
