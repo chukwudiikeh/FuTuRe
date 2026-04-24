@@ -98,11 +98,6 @@ export async function getBalance(publicKey) {
   }));
 
   logger.info('stellar.balanceFetched', { publicKey, balances });
-  await eventMonitor.publishEvent(publicKey, {
-    type: 'BalanceChecked',
-    data: { balances },
-    version: 1
-  });
 
   return { publicKey, balances };
 }
