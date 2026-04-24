@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { isValidStellarAddress } from './utils/validateStellarAddress';
@@ -24,6 +24,7 @@ import { ImportAccountForm } from './components/ImportAccountForm';
 import { ConfirmSendDialog } from './components/ConfirmSendDialog';
 import { LanguageSelector } from './components/LanguageSelector';
 import { FileUpload } from './components/FileUpload';
+import { AccountCreatedCelebration } from './components/AccountCreatedCelebration';
 import { useTheme } from './contexts/ThemeContext';
 import { useAppState, useAppDispatch, A } from './store/index.js';
 
@@ -58,6 +59,7 @@ function App() {
   const { queue: queueOffline, dequeue, pendingItems, pendingCount } = useOfflineQueue();
   const [replaySecret, setReplaySecret] = useState('');
   const [showReplayPrompt, setShowReplayPrompt] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const { theme, isDark, toggleTheme } = useTheme();
   useRTL();
   const prefersReduced = useReducedMotion();
@@ -149,7 +151,7 @@ function App() {
       const { data } = await withTimeout(signal => axios.post('/api/stellar/account/create', null, { signal }));
       dispatch({ type: A.SET_ACCOUNT, payload: data });
       resetForm();
-      msg.success('Account created! Save your secret key securely.');
+      setShowCelebration(true);
     } catch (error) {
       logError(error, { context: 'createAccount' });
       msg.error(getFriendlyError(error), { retry: createAccount });
@@ -232,6 +234,16 @@ function App() {
     <>
       {/* Skip navigation link */}
       <a href="#main-content" className="skip-link">Skip to main content</a>
+
+      {/* Account creation celebration overlay */}
+      <AccountCreatedCelebration
+        visible={showCelebration}
+        onDone={() => {
+          setShowCelebration(false);
+          msg.success('Account created! Save your secret key securely.');
+        }}
+        reducedMotion={prefersReduced}
+      />
 
       <div className="app">
         {/* Screen-reader live region for loading states */}
