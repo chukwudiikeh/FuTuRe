@@ -40,7 +40,7 @@ export function wrapWithFeeBump(innerTx, feeAccountSecret) {
 let horizonServerUrl;
 let horizonServer;
 
-function getHorizonServer() {
+export function getHorizonServer() {
   const { horizonUrl } = getConfig().stellar;
   if (!horizonServer || horizonUrl !== horizonServerUrl) {
     horizonServerUrl = horizonUrl;
