@@ -98,6 +98,10 @@ function App() {
         e.preventDefault();
         if (loading !== 'create') createAccount();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        if (loading !== 'balance') checkBalance();
+      }
       if (e.key === 'Escape') {
         dispatch({ type: A.SET_SHOW_QR, payload: false });
         dispatch({ type: A.SET_SHOW_SHORTCUTS, payload: false });
@@ -288,6 +292,50 @@ function App() {
           {loading === 'import' && 'Importing account…'}
         </div>
 
+        {/* PWA banners */}
+        <AnimatePresence>
+          {updateAvailable && (
+            <motion.div className="pwa-banner pwa-banner--update" role="status" variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
+              <span>A new version is available.</span>
+              <button type="button" className="pwa-banner__btn" onClick={applyUpdate}>Update now</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      {/* Keyboard shortcuts panel */}
+      <AnimatePresence>
+        {showShortcuts && (
+          <motion.div className="shortcuts-panel" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" variants={v.pop} initial="hidden" animate="visible" exit="exit">
+            <div className="shortcuts-panel__header">
+              <strong>Keyboard Shortcuts</strong>
+              <button type="button" className="qr-close" onClick={() => dispatch({ type: A.SET_SHOW_SHORTCUTS, payload: false })} aria-label="Close">✕</button>
+            </div>
+            <ul className="shortcuts-list">
+              <li><kbd>Ctrl+N</kbd> Create new account</li>
+              <li><kbd>Ctrl+B</kbd> Check balance</li>
+              <li><kbd>Ctrl+C</kbd> Copy key (when copy button focused)</li>
+              <li><kbd>Escape</kbd> Close modals</li>
+              <li><kbd>?</kbd> Toggle this help</li>
+              <li><kbd>Tab</kbd> Navigate between fields</li>
+              <li><kbd>Enter</kbd> Submit focused form</li>
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create / Import Account */}
+      <motion.div className="section" variants={v.fadeSlide} initial="hidden" animate="visible">
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <motion.button onClick={createAccount} {...tap} disabled={loading === 'create'} title="Create account (Ctrl+N)">
+            {loading === 'create' ? <Spinner label="Creating account..." /> : 'Create Account'}
+          </motion.button>
+          <motion.button
+            onClick={() => dispatch({ type: A.SET_SHOW_IMPORT, payload: !showImportForm })}
+            {...tap}
+            style={{ background: '#6366f1' }}
+          >
+            {showImportForm ? 'Cancel Import' : 'Import Account'}
+          </motion.button>
+        </div>
         <AnimatePresence>
           {pendingCount > 0 && (
             <motion.div className="pwa-banner pwa-banner--queue" role="status" variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
@@ -396,6 +444,7 @@ function App() {
               </div>
               <ul className="shortcuts-list">
                 <li><kbd>Ctrl+N</kbd> Create new account</li>
+                <li><kbd>Ctrl+B</kbd> Check balance</li>
                 <li><kbd>Ctrl+C</kbd> Copy key (when copy button focused)</li>
                 <li><kbd>Escape</kbd> Close modals</li>
                 <li><kbd>?</kbd> Toggle this help</li>
