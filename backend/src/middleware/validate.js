@@ -57,6 +57,11 @@ export const rules = {
     .matches(STELLAR_PUBLIC_KEY)
     .withMessage('Invalid Stellar account ID'),
 
+  addressParam: param('address')
+    .trim()
+    .matches(STELLAR_PUBLIC_KEY)
+    .withMessage('Invalid Stellar address'),
+
   importAccount: [
     body('secretKey')
       .trim()
