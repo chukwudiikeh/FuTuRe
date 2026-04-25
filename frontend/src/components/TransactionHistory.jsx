@@ -12,6 +12,49 @@ function fmt(dateStr) {
 }
 
 function TxRow({ tx, onClick, onRetry }) {
+function csvEscape(val) {
+  const s = val == null ? '' : String(val);
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+async function fetchAllTransactions(publicKey) {
+  const all = [];
+  let cursor = null;
+  do {
+    const params = { limit: 50, ...(cursor ? { cursor } : {}) };
+    const { data } = await axios.get(`/api/stellar/account/${publicKey}/transactions`, { params });
+    all.push(...(data.records ?? []));
+    cursor = data.nextCursor ?? null;
+  } while (cursor);
+  return all;
+}
+
+function downloadCsv(rows, filename) {
+  const COLS = ['date', 'type', 'direction', 'amount', 'asset', 'counterparty', 'hash', 'fee', 'status'];
+  const lines = [
+    COLS.join(','),
+    ...rows.map(tx => [
+      tx.date ? new Date(tx.date).toISOString() : '',
+      TYPE_LABELS[tx.type] ?? tx.type ?? '',
+      tx.direction ?? '',
+      tx.amount ?? '',
+      tx.asset ?? 'XLM',
+      tx.counterparty ?? '',
+      tx.hash ?? '',
+      tx.fee ?? '',
+      tx.successful ? 'success' : 'failed',
+    ].map(csvEscape).join(',')),
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function TxRow({ tx, onClick }) {
   const isReceived = tx.direction === 'received';
   const isSent = tx.direction === 'sent';
   const label = `${TYPE_LABELS[tx.type] ?? tx.type}, ${tx.direction ?? ''}, ${tx.amount ? `${tx.amount} ${tx.asset ?? 'XLM'}` : ''}, ${fmt(tx.date)}, ${tx.successful ? 'successful' : 'failed'}`;
@@ -108,6 +151,20 @@ export function TransactionHistory({ publicKey }) {
   const [cursors, setCursors] = useState([]); // ring-buffer for back-pagination (max 50)
   const [error, setError] = useState(null);
   const [retrying, setRetrying] = useState({}); // { [txId]: 'pending' | 'success' | 'error' }
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const all = await fetchAllTransactions(publicKey);
+      const date = new Date().toISOString().slice(0, 10);
+      downloadCsv(all, `transactions-${publicKey.slice(0, 8)}-${date}.csv`);
+    } catch (e) {
+      setError(e?.response?.data?.error ?? e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const MAX_CURSOR_HISTORY = 50;
 
@@ -162,15 +219,27 @@ export function TransactionHistory({ publicKey }) {
     <section className="section" aria-labelledby="tx-history-heading">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <h3 id="tx-history-heading">Transaction History</h3>
-        <motion.button
-          className="tx-load-btn"
-          onClick={handleLoad}
-          disabled={loading}
-          whileTap={{ scale: 0.97 }}
-          aria-label={loaded ? 'Refresh transaction history' : 'Load transaction history'}
-        >
-          {loading ? <Spinner label="Loading transactions…" /> : loaded ? '↺ Refresh' : 'Load History'}
-        </motion.button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <motion.button
+            onClick={handleExportCsv}
+            disabled={exporting || loading}
+            whileTap={{ scale: 0.97 }}
+            aria-label="Export transaction history as CSV"
+            aria-busy={exporting}
+            style={{ background: '#16a34a' }}
+          >
+            {exporting ? <Spinner label="Exporting…" /> : '⬇ Export CSV'}
+          </motion.button>
+          <motion.button
+            className="tx-load-btn"
+            onClick={handleLoad}
+            disabled={loading}
+            whileTap={{ scale: 0.97 }}
+            aria-label={loaded ? 'Refresh transaction history' : 'Load transaction history'}
+          >
+            {loading ? <Spinner label="Loading transactions…" /> : loaded ? '↺ Refresh' : 'Load History'}
+          </motion.button>
+        </div>
       </div>
 
       <form className="tx-filters" onSubmit={applyFilters} aria-label="Filter transactions">
