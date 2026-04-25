@@ -16,11 +16,14 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { QRCodeModal } from './components/QRCodeModal';
 import { QRScanner } from './components/QRScanner';
 import { NetworkBadge } from './components/NetworkBadge';
+import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { StatusMessage } from './components/StatusMessage';
 import { CopyButton } from './components/CopyButton';
 import { Spinner } from './components/Spinner';
 import { TransactionHistory } from './components/TransactionHistory';
 import { StreamPayment } from './components/StreamPayment';
+import { PathPayment } from './components/PathPayment';
+import { AccountSettings } from './components/AccountSettings';
 import { FeeDisplay } from './components/FeeDisplay';
 import { InlineConfirmation } from './components/InlineConfirmation';
 import { logError } from './utils/errorLogger';
@@ -71,6 +74,7 @@ function App() {
   const { queue: queueOffline, dequeue, pendingItems, pendingCount } = useOfflineQueue();
   const [showTxLookup, setShowTxLookup] = useState(false);
   const [deepLinkHash, setDeepLinkHash] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
   const [lastWsMessage, setLastWsMessage] = useState(null);
   const [activeSettingsSection, setActiveSettingsSection] = useState(null); // null, 'multisig', 'kyc', 'notifications'
   const { isDark, toggleTheme } = useTheme();
@@ -92,7 +96,7 @@ function App() {
 
   const wsStatus = useWebSocket(account?.publicKey ?? null, handleWsMessage);
   const { status: networkStatus } = useNetworkStatus();
-  const xlmUsdRate = useExchangeRate(lastWsMessage);
+  const { rate: xlmUsdRate, loading: rateLoading } = useExchangeRate(lastWsMessage);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -324,6 +328,7 @@ function App() {
       />
 
       <div className="app">
+        <NetworkStatusBanner />
         <div aria-live="polite" aria-atomic="true" className="sr-only">
           {loading === 'create' && 'Creating account…'}
           {loading === 'balance' && 'Checking balance…'}
@@ -453,6 +458,17 @@ function App() {
                 🔍
               </button>
               <NotificationBell />
+              {account && (
+                <button
+                  type="button"
+                  className="shortcuts-help-btn"
+                  onClick={() => setShowSettings(true)}
+                  aria-label="Account settings"
+                  title="Account settings"
+                >
+                  ⚙️
+                </button>
+              )}
               <NetworkBadge status={networkStatus} />
               <motion.span
                 animate={{ opacity: [0.6, 1, 0.6] }}
@@ -579,11 +595,12 @@ function App() {
                   )}
                 </AnimatePresence>
                 <FeeDisplay amount={amount} visible={amountValid} />
-                {amountValid && xlmUsdRate && (
-                  <p className="rate-estimate" aria-live="polite">
-                    ≈ ${(parseFloat(amount) * xlmUsdRate).toFixed(2)} USD
-                    <span className="rate-source"> · live rate</span>
-                  </p>
+                {amountValid && (xlmUsdRate
+                  ? <p className="rate-estimate" aria-live="polite">
+                      ≈ ${(parseFloat(amount) * xlmUsdRate).toFixed(2)} USD
+                      <span className="rate-source"> · live rate</span>
+                    </p>
+                  : rateLoading && <p className="rate-estimate rate-estimate--loading" aria-live="polite">Loading rate…</p>
                 )}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <motion.button onClick={sendPayment} {...tap} disabled={!recipientValid || !amountValid || loading === 'send'}>
@@ -795,11 +812,12 @@ function App() {
                     </div>
 
                     <FeeDisplay amount={amount} visible={amountValid} />
-                    {amountValid && xlmUsdRate && (
-                      <p className="rate-estimate" aria-live="polite">
-                        ≈ ${(parseFloat(amount) * xlmUsdRate).toFixed(2)} USD
-                        <span className="rate-source"> · live rate</span>
-                      </p>
+                    {amountValid && (xlmUsdRate
+                      ? <p className="rate-estimate" aria-live="polite">
+                          ≈ ${(parseFloat(amount) * xlmUsdRate).toFixed(2)} USD
+                          <span className="rate-source"> · live rate</span>
+                        </p>
+                      : rateLoading && <p className="rate-estimate rate-estimate--loading" aria-live="polite">Loading rate…</p>
                     )}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <motion.button
@@ -902,6 +920,10 @@ function App() {
                     )}
                   </AnimatePresence>
                 </motion.section>
+                {/* Path Payment */}
+                <motion.div variants={v.fadeSlide}>
+                  <PathPayment account={account} />
+                </motion.div>
 
               </motion.div>
             )}
@@ -986,6 +1008,13 @@ function App() {
             />
           )}
         </AnimatePresence>
+
+        {showSettings && account && (
+          <AccountSettings
+            publicKey={account.publicKey}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
       </div>
     </>
   );
