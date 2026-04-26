@@ -12,9 +12,22 @@ import { cacheMiddleware } from '../middleware/cache.js';
 import { keys as cacheKeys, TTL, invalidateBalance } from '../cache/appCache.js';
 import prisma from '../db/client.js';
 import { getSubscriptionByPublicKey, sendWebPush } from '../notifications/webPush.js';
+import logger from '../config/logger.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
+
+function logError(req, error, context = {}) {
+  logger.error('route.error', {
+    requestId: req.id,
+    correlationId: req.correlationId,
+    method: req.method,
+    path: req.path,
+    ...context,
+    error: error.message,
+    stack: error.stack,
+  });
+}
 
 /**
  * @swagger
@@ -42,7 +55,8 @@ router.post('/account/create', async (req, res) => {
     const account = await StellarService.createAccount();
     res.json(account);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error);
+    res.status(500).json({ error: 'Failed to create account' });
   }
 });
 
@@ -52,7 +66,8 @@ router.post('/account/fund', rules.publicKeyBody, validate, async (req, res) => 
     const result = await StellarService.fundAccount(req.body.publicKey);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { publicKey: req.body.publicKey });
+    res.status(500).json({ error: 'Failed to fund account' });
   }
 });
 
@@ -105,7 +120,8 @@ router.get('/account/:publicKey', rules.publicKeyParam, validate,
       const balance = await StellarService.getBalance(req.params.publicKey);
       res.json(balance);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logError(req, error, { publicKey: req.params.publicKey });
+      res.status(500).json({ error: 'Failed to retrieve balance' });
     }
   }
 );
@@ -176,7 +192,8 @@ router.post('/payment/send', paymentRateLimiter, rules.sendPayment, validate, as
 
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { destination: req.body.destination, amount: req.body.amount, assetCode: req.body.assetCode });
+    res.status(500).json({ error: 'Failed to send payment' });
   }
 });
 
@@ -230,7 +247,8 @@ router.get('/account/:publicKey/transactions', rules.publicKeyParam, validate, a
     }
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { publicKey: req.params.publicKey });
+    res.status(500).json({ error: 'Failed to retrieve transactions' });
   }
 });
 
@@ -238,7 +256,8 @@ router.get('/fee-stats', cacheMiddleware(TTL.FEE_STATS, () => cacheKeys.feeStats
   try {
     res.json(await StellarService.getFeeStats());
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error);
+    res.status(500).json({ error: 'Failed to retrieve fee stats' });
   }
 });
 
@@ -253,7 +272,8 @@ router.get('/exchange-rate/:from/:to', rules.assetCodeParams, validate,
       }
       res.json({ from, to, rate });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logError(req, error, { from: req.params.from, to: req.params.to });
+      res.status(500).json({ error: 'Failed to retrieve exchange rate' });
     }
   }
 );
@@ -264,7 +284,8 @@ router.get('/rates', async (req, res) => {
     const rates = await getAllRates();
     res.json({ rates });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error);
+    res.status(500).json({ error: 'Failed to retrieve rates' });
   }
 });
 
@@ -276,7 +297,8 @@ router.get('/convert/:from/:to/:amount', rules.assetCodeParams, validate, async 
     const result = await convert(amount, req.params.from, req.params.to);
     res.json({ from: req.params.from, to: req.params.to, amount, converted: result });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { from: req.params.from, to: req.params.to, amount: req.params.amount });
+    res.status(500).json({ error: 'Failed to convert amount' });
   }
 });
 
@@ -285,7 +307,8 @@ router.get('/network/status', async (req, res) => {
     const status = await StellarService.getNetworkStatus();
     res.json(status);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error);
+    res.status(500).json({ error: 'Failed to retrieve network status' });
   }
 });
 
@@ -375,7 +398,8 @@ router.post('/trustline', rules.createTrustline, validate, async (req, res) => {
     const result = await StellarService.createTrustline(sourceSecret, assetCode);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { assetCode: req.body.assetCode });
+    res.status(500).json({ error: 'Failed to create trustline' });
   }
 });
 
@@ -387,7 +411,8 @@ router.get('/account/:publicKey/label', rules.publicKeyParam, validate, async (r
     });
     res.json({ accountLabel: user?.settings?.accountLabel ?? null });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { publicKey: req.params.publicKey });
+    res.status(500).json({ error: 'Failed to retrieve account label' });
   }
 });
 
@@ -409,7 +434,8 @@ router.put('/account/:publicKey/label', rules.publicKeyParam, validate,
       });
       res.json({ accountLabel: accountLabel || null });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logError(req, error, { publicKey: req.params.publicKey });
+      res.status(500).json({ error: 'Failed to update account label' });
     }
   }
 );
@@ -429,7 +455,8 @@ router.get('/account/:publicKey/settings', rules.publicKeyParam, validate, async
       kycSubmittedAt: user?.kycRecord?.submittedAt ?? null,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logError(req, error, { publicKey: req.params.publicKey });
+    res.status(500).json({ error: 'Failed to retrieve account settings' });
   }
 });
 
@@ -457,7 +484,8 @@ router.put('/account/:publicKey/settings',
       });
       res.json({ defaultAsset: settings.defaultAsset, notificationsOn: settings.notificationsOn });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      logError(req, error, { publicKey: req.params.publicKey });
+      res.status(500).json({ error: 'Failed to update account settings' });
     }
   }
 );
