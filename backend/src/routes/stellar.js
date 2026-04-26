@@ -231,6 +231,35 @@ router.post('/payment/send', paymentRateLimiter, rules.sendPayment, validate, as
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+/**
+ * @swagger
+ * /api/stellar/account/{publicKey}/trustlines:
+ *   get:
+ *     summary: Get trustlines for an account
+ *     description: Returns all non-native trustlines (asset code, issuer, balance, limit, authorized flag).
+ *     tags: [Stellar]
+ *     parameters:
+ *       - in: path
+ *         name: publicKey
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Trustlines retrieved successfully
+ *       500:
+ *         description: Server error
+ */
+router.get('/account/:publicKey/trustlines', rules.publicKeyParam, validate, async (req, res) => {
+  try {
+    const trustlines = await StellarService.getTrustlines(req.params.publicKey);
+    res.json({ trustlines });
+  } catch (error) {
+    logError(req, error, { publicKey: req.params.publicKey });
+    res.status(500).json({ error: 'Failed to retrieve trustlines' });
+  }
+});
+
 router.get('/account/:publicKey/transactions', rules.publicKeyParam, validate, async (req, res) => {
   try {
     const { cursor, limit, type, dateFrom, dateTo, hash } = req.query;
