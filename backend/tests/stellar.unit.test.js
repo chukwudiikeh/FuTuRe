@@ -181,7 +181,7 @@ describe('Stellar Service Unit Tests', () => {
     // Setup Stellar SDK mocks
     StellarSDK.Keypair.random.mockReturnValue(mockKeypair);
     StellarSDK.Keypair.fromSecret.mockReturnValue(mockKeypair);
-    StellarSDK.Horizon.Server.mockReturnValue(mockServer);
+    StellarSDK.Horizon.Server.mockImplementation(function () { return mockServer; });
     StellarSDK.Asset.native.mockReturnValue({ code: 'XLM', issuer: null });
     StellarSDK.TransactionBuilder.mockReturnValue(mockTransactionBuilder);
     StellarSDK.Operation.payment.mockReturnValue({});
@@ -568,7 +568,7 @@ describe('Stellar Service Unit Tests', () => {
 
     it('should return null for invalid asset pair', async () => {
       mockServer.orderbook.mockReturnValueOnce({
-        call: vi.fn(() => Promise.reject(new Error('Invalid assets')),
+        call: vi.fn(() => Promise.reject(new Error('Invalid assets'))),
       });
       
       const result = await stellarService.getExchangeRate('INVALID', 'USDC');
@@ -578,7 +578,7 @@ describe('Stellar Service Unit Tests', () => {
 
     it('should handle orderbook fetch failure', async () => {
       mockServer.orderbook.mockReturnValueOnce({
-        call: vi.fn(() => Promise.reject(new Error('Orderbook unavailable')),
+        call: vi.fn(() => Promise.reject(new Error('Orderbook unavailable'))),
       });
       
       const result = await stellarService.getExchangeRate('XLM', 'USDC');
@@ -620,6 +620,56 @@ describe('Stellar Service Unit Tests', () => {
       const result = await stellarService.getNetworkStatus();
       
       expect(result).toHaveProperty('network', 'mainnet');
+    });
+  });
+
+  describe('getTrustlines', () => {
+    it('should return only non-native balances', async () => {
+      const publicKey = 'GBRPYHIL2CI3WHZDTOOQFC6EB4KJJGUJJBBX7IXLMQVVXTNQRYUOP7H';
+      const result = await stellarService.getTrustlines(publicKey);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.every(t => t.assetCode !== undefined)).toBe(true);
+    });
+
+    it('should map fields correctly', async () => {
+      mockServer.loadAccount.mockResolvedValueOnce({
+        balances: [
+          { asset_type: 'native', balance: '100.0000000' },
+          {
+            asset_type: 'credit_alphanum4',
+            asset_code: 'USDC',
+            asset_issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+            balance: '50.0000000',
+            limit: '922337203685.4775807',
+            is_authorized: true,
+          },
+        ],
+      });
+      const publicKey = 'GBRPYHIL2CI3WHZDTOOQFC6EB4KJJGUJJBBX7IXLMQVVXTNQRYUOP7H';
+      const result = await stellarService.getTrustlines(publicKey);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        assetCode: 'USDC',
+        issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+        balance: '50.0000000',
+        limit: '922337203685.4775807',
+        authorized: true,
+      });
+    });
+
+    it('should return empty array when account has no trustlines', async () => {
+      mockServer.loadAccount.mockResolvedValueOnce({
+        balances: [{ asset_type: 'native', balance: '100.0000000' }],
+      });
+      const result = await stellarService.getTrustlines('GBRPYHIL2CI3WHZDTOOQFC6EB4KJJGUJJBBX7IXLMQVVXTNQRYUOP7H');
+      expect(result).toEqual([]);
+    });
+
+    it('should propagate errors from Horizon', async () => {
+      mockServer.loadAccount.mockRejectedValueOnce(new Error('Account not found'));
+      await expect(
+        stellarService.getTrustlines('GBRPYHIL2CI3WHZDTOOQFC6EB4KJJGUJJBBX7IXLMQVVXTNQRYUOP7H')
+      ).rejects.toThrow('Account not found');
     });
   });
 

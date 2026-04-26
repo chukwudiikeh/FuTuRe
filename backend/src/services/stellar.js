@@ -427,6 +427,20 @@ export async function getNetworkStatus() {
     };
   }
 }
+export async function getTrustlines(publicKey) {
+  logger.debug('stellar.getTrustlines', { publicKey });
+  const account = await getHorizonServer().loadAccount(publicKey);
+  return account.balances
+    .filter(b => b.asset_type !== 'native')
+    .map(b => ({
+      assetCode: b.asset_code,
+      issuer: b.asset_issuer,
+      balance: b.balance,
+      limit: b.limit,
+      authorized: b.is_authorized === true,
+    }));
+}
+
 export async function mergeAccount(sourceSecret, destination) {
   const sourceKeypair = StellarSDK.Keypair.fromSecret(sourceSecret);
   const sourcePublicKey = sourceKeypair.publicKey();
