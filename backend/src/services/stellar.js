@@ -359,6 +359,7 @@ export async function getTransactions(publicKey, { cursor, limit = 10, type, dat
   return {
     records,
     nextCursor: page.records.length === limit ? page.records[page.records.length - 1].paging_token : null,
+    hasMore: page.records.length === limit,
   };
 }
 

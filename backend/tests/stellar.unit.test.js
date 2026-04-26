@@ -473,6 +473,7 @@ describe('Stellar Service Unit Tests', () => {
       
       expect(result).toHaveProperty('records');
       expect(result).toHaveProperty('nextCursor');
+      expect(result).toHaveProperty('hasMore');
       expect(Array.isArray(result.records)).toBe(true);
     });
 
@@ -568,7 +569,7 @@ describe('Stellar Service Unit Tests', () => {
 
     it('should return null for invalid asset pair', async () => {
       mockServer.orderbook.mockReturnValueOnce({
-        call: vi.fn(() => Promise.reject(new Error('Invalid assets')),
+        call: vi.fn(() => Promise.reject(new Error('Invalid assets'))),
       });
       
       const result = await stellarService.getExchangeRate('INVALID', 'USDC');
@@ -578,7 +579,7 @@ describe('Stellar Service Unit Tests', () => {
 
     it('should handle orderbook fetch failure', async () => {
       mockServer.orderbook.mockReturnValueOnce({
-        call: vi.fn(() => Promise.reject(new Error('Orderbook unavailable')),
+        call: vi.fn(() => Promise.reject(new Error('Orderbook unavailable'))),
       });
       
       const result = await stellarService.getExchangeRate('XLM', 'USDC');
