@@ -32,6 +32,7 @@ import { eventMonitor } from './eventSourcing/index.js';
 import streamingRoutes from './routes/streaming.js';
 import { processActiveStreams } from './services/streaming.js';
 import retryRoutes from './routes/retry.js';
+import accountsRoutes from './routes/accounts.js';
 import { auditLogger } from './security/index.js';
 import { getConfig } from './config/env.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
@@ -116,6 +117,7 @@ app.use('/api/cache', cacheRoutes);
 app.use('/api/streaming', streamingRoutes);
 app.use('/api/recovery', recoveryRoutes);
 app.use('/api/retry', retryRoutes);
+app.use('/api/accounts', accountsRoutes);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);
