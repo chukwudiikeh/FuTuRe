@@ -473,6 +473,7 @@ describe('Stellar Service Unit Tests', () => {
       
       expect(result).toHaveProperty('records');
       expect(result).toHaveProperty('nextCursor');
+      expect(result).toHaveProperty('hasMore');
       expect(Array.isArray(result.records)).toBe(true);
     });
 

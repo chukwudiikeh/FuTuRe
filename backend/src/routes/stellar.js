@@ -199,31 +199,82 @@ router.post('/payment/send', paymentRateLimiter, rules.sendPayment, validate, as
 
 /**
  * @swagger
- * /api/stellar/exchange-rate/{from}/{to}:
+ * /api/stellar/account/{publicKey}/transactions:
  *   get:
- *     summary: Get exchange rate
- *     description: Retrieves the exchange rate between two assets on the Stellar network.
+ *     summary: List transactions for an account
+ *     description: >
+ *       Returns a cursor-paginated list of transactions for the given account.
+ *       Pass the `nextCursor` value from a previous response as `cursor` to
+ *       fetch the next page. `hasMore: true` means another page is available.
+ *       `hasMore: false` (and `nextCursor: null`) means you have reached the end.
  *     tags: [Stellar]
  *     parameters:
  *       - in: path
- *         name: from
+ *         name: publicKey
  *         required: true
  *         schema:
  *           type: string
- *         description: The source asset code.
- *       - in: path
- *         name: to
- *         required: true
+ *         description: Stellar public key of the account.
+ *       - in: query
+ *         name: cursor
  *         schema:
  *           type: string
- *         description: The target asset code.
+ *         description: Paging token from a previous response's `nextCursor` field.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 10
+ *         description: Number of records to return (max 50).
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: Filter by operation type (e.g. `payment`).
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Include only transactions on or after this ISO-8601 timestamp.
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Include only transactions on or before this ISO-8601 timestamp.
+ *       - in: query
+ *         name: hash
+ *         schema:
+ *           type: string
+ *         description: Filter by transaction hash prefix.
  *     responses:
  *       200:
- *         description: Exchange rate retrieved successfully
+ *         description: Transactions retrieved successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ExchangeRate'
+ *               type: object
+ *               properties:
+ *                 records:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Transaction'
+ *                 nextCursor:
+ *                   type: string
+ *                   nullable: true
+ *                   description: >
+ *                     Paging token to pass as `cursor` on the next request.
+ *                     `null` when there are no more pages.
+ *                 hasMore:
+ *                   type: boolean
+ *                   description: >
+ *                     `true` if a subsequent page exists; `false` when this is
+ *                     the last page.
+ *       422:
+ *         description: Validation error
  *       500:
  *         description: Server error
  *         content:
@@ -290,6 +341,40 @@ router.get('/fee-stats', cacheMiddleware(TTL.FEE_STATS, () => cacheKeys.feeStats
   }
 });
 
+/**
+ * @swagger
+ * /api/stellar/exchange-rate/{from}/{to}:
+ *   get:
+ *     summary: Get exchange rate
+ *     description: Retrieves the exchange rate between two assets on the Stellar network.
+ *     tags: [Stellar]
+ *     parameters:
+ *       - in: path
+ *         name: from
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The source asset code.
+ *       - in: path
+ *         name: to
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The target asset code.
+ *     responses:
+ *       200:
+ *         description: Exchange rate retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ExchangeRate'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/exchange-rate/:from/:to', rules.assetCodeParams, validate,
   cacheMiddleware(TTL.RATE, (req) => cacheKeys.rate(req.params.from, req.params.to)),
   async (req, res) => {

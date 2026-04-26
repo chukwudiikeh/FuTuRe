@@ -219,7 +219,7 @@ router.get('/account/:publicKey/transactions', requireMobileAuth, async (req, re
   try {
     const { limit = 10, cursor } = req.query;
     const result = await StellarService.getTransactions(req.params.publicKey, { limit: Number(limit), cursor });
-    res.json({ publicKey: req.params.publicKey, transactions: result.records, nextCursor: result.nextCursor });
+    res.json({ publicKey: req.params.publicKey, transactions: result.records, nextCursor: result.nextCursor, hasMore: result.hasMore });
   } catch (e) {
     res.status(404).json({ error: e.message });
   }
