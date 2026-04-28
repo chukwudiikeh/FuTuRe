@@ -14,6 +14,7 @@ import { useRTL } from './hooks/useRTL';
 import { makeVariants, tapScale } from './utils/animations';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { QRCodeModal } from './components/QRCodeModal';
+import { PaymentConfirmationModal } from './components/PaymentConfirmationModal';
 import { QRScanner } from './components/QRScanner';
 import { NetworkBadge } from './components/NetworkBadge';
 import { NetworkStatusBanner } from './components/NetworkStatusBanner';
@@ -58,6 +59,13 @@ function withTimeout(promiseFn) {
 }
 
 function App() {
+  const [account, setAccount] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState('');
+  const [showQR, setShowQR] = useState(false);
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
   const { account, balance, loading, recipient, amount, memo, memoType, showQR, showImportForm, showShortcuts, accountLabel } = useAppState();
   const dispatch = useAppDispatch();
 
@@ -298,6 +306,12 @@ function App() {
 
   const sendPayment = async () => {
     if (!account || !recipientValid || !amountValid) return;
+    setShowPaymentConfirmation(true);
+  };
+
+  const confirmPayment = async () => {
+    if (!account || !recipientValid || !amountValid) return;
+    setLoading('send');
     if (kycStatus !== 'APPROVED' && parseFloat(amount) > KYC_LARGE_TRANSACTION_LIMIT) {
       msg.error(`Large transactions above ${KYC_LARGE_TRANSACTION_LIMIT} XLM require approved KYC.`);
       return;
@@ -319,7 +333,13 @@ function App() {
       msg.success(`Payment sent! Hash: ${data.hash.slice(0, 8)}…`, { hash: data.hash });
       resetForm();
       checkBalance();
+      setShowPaymentConfirmation(false);
+      setAmount('');
+      setRecipient('');
     } catch (error) {
+      logError(error, { context: 'sendPayment' });
+      msg.error(getFriendlyError(error), { retry: confirmPayment });
+    } finally { setLoading(''); }
       dispatch({ type: A.REVERT_BALANCE });
       if (!navigator.onLine) {
         await queueOffline({ destination: payload.destination, amount: payload.amount, assetCode: payload.assetCode });
@@ -1060,6 +1080,17 @@ function App() {
           )}
         </AnimatePresence>
 
+      {/* Payment Confirmation Modal */}
+      <AnimatePresence>
+        {showPaymentConfirmation && (
+          <PaymentConfirmationModal
+            isOpen={showPaymentConfirmation}
+            onClose={() => setShowPaymentConfirmation(false)}
+            onConfirm={confirmPayment}
+            recipient={recipient}
+            amount={amount}
+            estimatedFee="0.00001"
+            loading={loading === 'send'}
         {showSettings && account && (
           <AccountSettings
             publicKey={account.publicKey}
