@@ -911,12 +911,16 @@ function App() {
 
                 {/* Transaction History */}
                 <motion.div variants={v.fadeSlide}>
-                  <TransactionHistory publicKey={account.publicKey} />
+                  <ErrorBoundary context="Transaction History">
+                    <TransactionHistory publicKey={account.publicKey} />
+                  </ErrorBoundary>
                 </motion.div>
 
                 {/* Stream Payments */}
                 <motion.div variants={v.fadeSlide}>
-                  <StreamPayment publicKey={account.publicKey} />
+                  <ErrorBoundary context="Stream Payments">
+                    <StreamPayment publicKey={account.publicKey} />
+                  </ErrorBoundary>
                 </motion.div>
 
                 {/* Asset Conversion Calculator */}
@@ -972,12 +976,16 @@ function App() {
                   <AnimatePresence mode="wait">
                     {activeSettingsSection === 'multisig' && (
                       <motion.div key="multisig" variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
-                        <MultiSigTransactions publicKey={account.publicKey} />
+                        <ErrorBoundary context="Multi-Sig Transactions">
+                          <MultiSigTransactions publicKey={account.publicKey} />
+                        </ErrorBoundary>
                       </motion.div>
                     )}
                     {activeSettingsSection === 'kyc' && (
                       <motion.div key="kyc" variants={v.fadeSlide} initial="hidden" animate="visible" exit="exit">
-                        <KYCForm />
+                        <ErrorBoundary context="KYC Form">
+                          <KYCForm />
+                        </ErrorBoundary>
                       </motion.div>
                     )}
                     {activeSettingsSection === 'notifications' && (
@@ -989,7 +997,9 @@ function App() {
                 </motion.section>
                 {/* Path Payment */}
                 <motion.div variants={v.fadeSlide}>
-                  <PathPayment account={account} />
+                  <ErrorBoundary context="Path Payment">
+                    <PathPayment account={account} />
+                  </ErrorBoundary>
                 </motion.div>
 
               </motion.div>
@@ -1095,7 +1105,9 @@ function App() {
         )}
 
         {showComplianceDashboard && (
-          <ComplianceDashboard onClose={() => setShowComplianceDashboard(false)} />
+          <ErrorBoundary context="Compliance Dashboard">
+            <ComplianceDashboard onClose={() => setShowComplianceDashboard(false)} />
+          </ErrorBoundary>
         )}
 
         {showBackupSettings && (
