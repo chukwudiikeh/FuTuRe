@@ -6,7 +6,6 @@ import { validateAmount, formatAmount } from './utils/validateAmount';
 import { getFriendlyError } from './utils/errorMessages';
 import { formatBalanceWithAsset } from './utils/formatBalance';
 import { useWebSocket } from './hooks/useWebSocket';
-import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useMessages } from './hooks/useMessages';
 import { usePWA } from './hooks/usePWA';
 import { useOfflineQueue } from './hooks/useOfflineQueue';
@@ -21,6 +20,7 @@ import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { StatusMessage } from './components/StatusMessage';
 import { CopyButton } from './components/CopyButton';
 import { Spinner } from './components/Spinner';
+import { SkeletonBalance } from './components/Skeleton';
 import { TransactionHistory } from './components/TransactionHistory';
 import { StreamPayment } from './components/StreamPayment';
 import { PathPayment } from './components/PathPayment';
@@ -40,6 +40,8 @@ import { NotificationBell } from './components/NotificationBell';
 import { useTheme } from './contexts/ThemeContext';
 import { useAppState, useAppDispatch, A } from './store/index.js';
 import { useExchangeRate } from './hooks/useExchangeRate';
+import { useBalance, useSendPayment, useCreateAccount, useImportAccount, useKycStatus, useSaveAccountLabel, useNetworkStatusQuery } from './hooks/useQueryHooks';
+import { AMMPoolBrowser } from './components/AMMPoolBrowser';
 import { ConvertWidget } from './components/ConvertWidget';
 import { XLMInfoIcon } from './components/XLMInfoIcon';
 
@@ -306,7 +308,6 @@ function App() {
 
   const confirmPayment = async () => {
     if (!account || !recipientValid || !amountValid) return;
-    setLoading('send');
     if (kycStatus !== 'APPROVED' && parseFloat(amount) > KYC_LARGE_TRANSACTION_LIMIT) {
       msg.error(`Large transactions above ${KYC_LARGE_TRANSACTION_LIMIT} XLM require approved KYC.`);
       return;
@@ -332,16 +333,13 @@ function App() {
       setAmount('');
       setRecipient('');
     } catch (error) {
-      logError(error, { context: 'sendPayment' });
-      msg.error(getFriendlyError(error), { retry: confirmPayment });
-    } finally { setLoading(''); }
       dispatch({ type: A.REVERT_BALANCE });
       if (!navigator.onLine) {
         await queueOffline({ destination: payload.destination, amount: payload.amount, assetCode: payload.assetCode });
         msg.info('You are offline. Payment queued — you\'ll be prompted to re-enter your secret key when back online.');
       } else {
         logError(error, { context: 'sendPayment' });
-        msg.error(getFriendlyError(error), { retry: sendPayment });
+        msg.error(getFriendlyError(error), { retry: confirmPayment });
       }
     } finally { dispatch({ type: A.SET_LOADING, payload: '' }); }
   };
@@ -709,11 +707,14 @@ function App() {
                     aria-busy={loading === 'balance'}
                     aria-label="Check account balance"
                   >
-                    {loading === 'balance' ? <Spinner label="Checking balance…" /> : 'Check Balance'}
+                    {loading === 'balance' ? 'Checking Balance…' : 'Check Balance'}
                   </motion.button>
-                  <AnimatePresence>
-                    {balance && (
+                  <AnimatePresence mode="wait">
+                    {loading === 'balance' ? (
+                      <SkeletonBalance key="loading-balance" />
+                    ) : balance ? (
                       <motion.div
+                        key="balance-list"
                         variants={v.pop} initial="hidden" animate="visible" exit="exit"
                         style={{ marginTop: 10 }}
                         aria-label="Account balances"
@@ -799,6 +800,7 @@ function App() {
                         aria-invalid={amountTouched && !!amountError}
                         aria-describedby={amountTouched && amountError ? 'amount-error' : undefined}
                         autoComplete="transaction-amount"
+                      />
                       {amountTouched && <span className="input-icon" aria-hidden="true">{amountValid ? '✅' : '❌'}</span>}
                       <motion.button
                         type="button"
@@ -912,12 +914,16 @@ function App() {
 
                 {/* Transaction History */}
                 <motion.div variants={v.fadeSlide}>
-                  <TransactionHistory publicKey={account.publicKey} />
+                  <ErrorBoundary context="Transaction History">
+                    <TransactionHistory publicKey={account.publicKey} />
+                  </ErrorBoundary>
                 </motion.div>
 
                 {/* Stream Payments */}
                 <motion.div variants={v.fadeSlide}>
-                  <StreamPayment publicKey={account.publicKey} />
+                  <ErrorBoundary context="Stream Payments">
+                    <StreamPayment publicKey={account.publicKey} />
+                  </ErrorBoundary>
                 </motion.div>
 
                 {/* Asset Conversion Calculator */}
@@ -980,6 +986,9 @@ function App() {
                         <Suspense fallback={<Spinner />}>
                           <MultiSigTransactions publicKey={account.publicKey} />
                         </Suspense>
+                        <ErrorBoundary context="Multi-Sig Transactions">
+                          <MultiSigTransactions publicKey={account.publicKey} />
+                        </ErrorBoundary>
                       </motion.div>
                     )}
                     {activeSettingsSection === 'kyc' && (
@@ -987,6 +996,9 @@ function App() {
                         <Suspense fallback={<Spinner />}>
                           <KYCForm />
                         </Suspense>
+                        <ErrorBoundary context="KYC Form">
+                          <KYCForm />
+                        </ErrorBoundary>
                       </motion.div>
                     )}
                     {activeSettingsSection === 'notifications' && (
@@ -998,7 +1010,9 @@ function App() {
                 </motion.section>
                 {/* Path Payment */}
                 <motion.div variants={v.fadeSlide}>
-                  <PathPayment account={account} />
+                  <ErrorBoundary context="Path Payment">
+                    <PathPayment account={account} />
+                  </ErrorBoundary>
                 </motion.div>
 
               </motion.div>
@@ -1107,6 +1121,9 @@ function App() {
           <Suspense fallback={<Spinner />}>
             <ComplianceDashboard onClose={() => setShowComplianceDashboard(false)} />
           </Suspense>
+          <ErrorBoundary context="Compliance Dashboard">
+            <ComplianceDashboard onClose={() => setShowComplianceDashboard(false)} />
+          </ErrorBoundary>
         )}
 
         {showBackupSettings && (
