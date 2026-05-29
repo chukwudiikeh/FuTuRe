@@ -5,13 +5,39 @@ import { createUser, findUser, getUserById, updateUserPassword } from '../auth/u
 import { signAccessToken, signRefreshToken, verifyToken } from '../auth/tokens.js';
 import { requireAuth } from '../middleware/auth.js';
 import { consumePendingCredentials } from '../recovery/recoveryStore.js';
+ ci/add-migration-smoke-test
+import prisma from '../db/client.js';
+
+import prisma from '../db/client.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { csrfTokenEndpoint } from '../middleware/csrf.js';
 import mfaManager from '../security/mfa.js';
 import oauth2Provider from '../security/oauth2.js';
 import { getConfig } from '../config/env.js';
+import { getConfig } from '../config/env.js';
+ main
 
 const router = express.Router();
+
+function setRefreshTokenCookie(res, refreshToken) {
+  const config = getConfig();
+  const isProduction = config.meta.appEnv === 'production';
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/api/auth',
+  });
+}
+
+// Stricter rate limit for login endpoint (5 req/15min)
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many login attempts, please try again later.',
+});
 
 const validateBody = (req, res, next) => {
   const errors = validationResult(req);
@@ -58,7 +84,7 @@ const userRules = [
  *       422:
  *         description: Validation error
  */
-router.post('/register', userRules, validateBody, async (req, res) => {
+router.post('/register', authRateLimiter, userRules, validateBody, async (req, res) => {
   try {
     const { username, password } = req.body;
     const passwordHash = await hashPassword(password);
@@ -97,7 +123,6 @@ router.post('/register', userRules, validateBody, async (req, res) => {
  *               type: object
  *               properties:
  *                 accessToken: { type: string }
- *                 refreshToken: { type: string }
  *                 recovered: { type: boolean }
  *       401:
  *         description: Invalid credentials
@@ -108,16 +133,7 @@ router.post('/register', userRules, validateBody, async (req, res) => {
  *       422:
  *         description: Validation error
  */
-router.post('/login', userRules, validateBody, async (req, res) => {
-// Stricter rate limit for login endpoint (10 req/min)
-const loginRateLimiter = createRateLimiter({
-  windowMs: 60000,
-  max: 10,
-  message: 'Too many login attempts, please try again later.',
-});
-
-// POST /api/auth/login
-router.post('/login', loginRateLimiter, userRules, validateBody, async (req, res) => {
+router.post('/login', authRateLimiter, userRules, validateBody, async (req, res) => {
   const { username, password } = req.body;
   const user = findUser(username);
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
@@ -129,9 +145,10 @@ router.post('/login', loginRateLimiter, userRules, validateBody, async (req, res
     if (valid) {
       updateUserPassword(user.id, recovered.passwordHash);
       const payload = { sub: user.id, username: user.username };
+      const refreshToken = signRefreshToken(payload);
+      setRefreshTokenCookie(res, refreshToken);
       return res.json({
         accessToken: signAccessToken(payload),
-        refreshToken: signRefreshToken(payload),
         recovered: true,
       });
     }
@@ -141,9 +158,10 @@ router.post('/login', loginRateLimiter, userRules, validateBody, async (req, res
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   const payload = { sub: user.id, username: user.username };
+  const refreshToken = signRefreshToken(payload);
+  setRefreshTokenCookie(res, refreshToken);
   res.json({
     accessToken: signAccessToken(payload),
-    refreshToken: signRefreshToken(payload),
   });
 });
 
@@ -154,16 +172,6 @@ router.post('/login', loginRateLimiter, userRules, validateBody, async (req, res
  *     summary: Refresh access token
  *     tags: [Auth]
  *     security: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [refreshToken]
- *             properties:
- *               refreshToken:
- *                 type: string
  *     responses:
  *       200:
  *         description: New access token
@@ -173,16 +181,16 @@ router.post('/login', loginRateLimiter, userRules, validateBody, async (req, res
  *               type: object
  *               properties:
  *                 accessToken: { type: string }
- *       400:
- *         description: refreshToken missing
  *       401:
  *         description: Invalid or expired refresh token
  */
 router.post('/refresh', (req, res) => {
-  const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(400).json({ error: 'refreshToken required' });
+  const refreshToken = req.cookies?.refreshToken;
+  if (!refreshToken) return res.status(401).json({ error: 'Refresh token missing or expired' });
   try {
     const { sub, username } = verifyToken(refreshToken);
+    const newRefreshToken = signRefreshToken({ sub, username });
+    setRefreshTokenCookie(res, newRefreshToken);
     res.json({ accessToken: signAccessToken({ sub, username }) });
   } catch {
     res.status(401).json({ error: 'Invalid or expired refresh token' });
@@ -433,6 +441,26 @@ router.get('/oauth/google/callback', async (req, res) => {
     res.redirect(`${frontendUrl}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`);
   } catch (error) {
     res.status(400).json({ error: error.message });
+// DELETE /api/auth/account
+router.delete('/account', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+    
+    // Soft delete the user (sets deletedAt timestamp)
+    const deletedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date() },
+    });
+
+    res.json({
+      message: 'Account deleted successfully',
+      deletedAt: deletedUser.deletedAt,
+    });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

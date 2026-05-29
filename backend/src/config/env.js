@@ -210,6 +210,22 @@ function requiredString(value, { envVarName }) {
   return value.trim();
 }
 
+function validateRequiredSecrets(env) {
+  const requiredSecrets = ['STREAM_SECRET_ENCRYPTION_KEY', 'DATABASE_URL'];
+  const missing = [];
+
+  for (const secret of requiredSecrets) {
+    const value = env[secret];
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      missing.push(secret);
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+
 export function createConfigFromEnv(env, { appEnv, nodeEnv, loadedEnvFiles } = {}) {
   const resolvedAppEnv = normalizeAppEnv(appEnv || env.APP_ENV || env.NODE_ENV || 'development');
   const resolvedNodeEnv =
@@ -226,6 +242,9 @@ export function createConfigFromEnv(env, { appEnv, nodeEnv, loadedEnvFiles } = {
       `Unsupported CONFIG_VERSION=${configVersion}. Expected ${CONFIG_SCHEMA_VERSION}.`
     );
   }
+
+  // Validate required secrets at startup
+  validateRequiredSecrets(env);
 
   const port = parseInteger(env.PORT, { envVarName: 'PORT', defaultValue: 3001 });
   assertValidPort(port, { envVarName: 'PORT' });
