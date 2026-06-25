@@ -9,6 +9,7 @@ import {
   getAccountLabel,
   updateAccountLabel,
   sendPayment as sendStellarPayment,
+  createTrustline,
 } from './api/stellar.js';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { isValidStellarAddress } from './utils/validateStellarAddress';
@@ -137,6 +138,9 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [lastWsMessage, setLastWsMessage] = useState(null);
   const [activeSettingsSection, setActiveSettingsSection] = useState(null); // null, 'multisig', 'kyc', 'notifications'
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [trustlineAsset, setTrustlineAsset] = useState(null);
+  const [trustlineLoading, setTrustlineLoading] = useState(false);
   const { isDark, toggleTheme } = useTheme();
   useRTL();
   const prefersReduced = useReducedMotion();
@@ -484,6 +488,35 @@ function App() {
       }
     } finally {
       dispatch({ type: A.SET_LOADING, payload: '' });
+    }
+  };
+
+  const handleCreateTrustline = async () => {
+    if (!account || !trustlineAsset) return;
+    
+    setTrustlineLoading(true);
+    try {
+      await createTrustline(account.secretKey, trustlineAsset);
+      msg.success(`Trustline created for ${trustlineAsset}!`);
+      checkBalance();
+      setTrustlineAsset(null);
+    } catch (error) {
+      logError(error, { context: 'createTrustline' });
+      msg.error(getFriendlyError(error));
+    } finally {
+      setTrustlineLoading(false);
+    }
+  };
+
+  const handleAssetChange = async (newAssetCode) => {
+    dispatch({ type: A.SET_ASSET_CODE, payload: newAssetCode });
+    
+    // Check if non-native asset requires trustline
+    if (newAssetCode !== 'XLM') {
+      const hasTrustline = balance?.balances?.some((b) => b.asset === newAssetCode);
+      if (!hasTrustline) {
+        setTrustlineAsset(newAssetCode);
+      }
     }
   };
 
@@ -923,7 +956,7 @@ function App() {
                     <select
                       id="asset-select"
                       value={assetCode}
-                      onChange={(e) => dispatch({ type: A.SET_ASSET_CODE, payload: e.target.value })}
+                      onChange={(e) => handleAssetChange(e.target.value)}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
@@ -940,6 +973,19 @@ function App() {
                       ))}
                     </select>
                   </div>
+                  {trustlineAsset && (
+                    <InlineConfirmation
+                      isVisible={!!trustlineAsset}
+                      message={`You don't have a trustline for ${trustlineAsset}. Create one?`}
+                      confirmText="Create Trustline"
+                      cancelText="Cancel"
+                      onConfirm={handleCreateTrustline}
+                      onCancel={() => {
+                        setTrustlineAsset(null);
+                        dispatch({ type: A.SET_ASSET_CODE, payload: 'XLM' });
+                      }}
+                    />
+                  )}
                   <div className="input-wrap">
                     <input
                       type="text"
