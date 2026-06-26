@@ -157,7 +157,7 @@ router.get(
       logError(req, error, { publicKey: req.params.publicKey });
       res.status(500).json({ error: 'Failed to retrieve balance' });
     }
-  }
+  },
 );
 
 /**
@@ -253,7 +253,11 @@ router.post(
       if (senderScreen.hit || recipientScreen.hit) {
         const reason = senderScreen.hit ? senderScreen.reason : recipientScreen.reason;
         logger.warn('route.payment.sanctions_hit', { senderKey, destination, reason });
-        return res.status(403).json({ error: { code: 'SANCTIONS_MATCH', message: 'Sanctions screening failed', reason } });
+        return res
+          .status(403)
+          .json({
+            error: { code: 'SANCTIONS_MATCH', message: 'Sanctions screening failed', reason },
+          });
       }
 
       const result = await StellarService.sendPayment(
@@ -263,7 +267,7 @@ router.post(
         assetCode,
         memo,
         memoType,
-        req.correlationId
+        req.correlationId,
       );
 
       // AML monitoring — run asynchronously after payment succeeds
@@ -276,16 +280,13 @@ router.post(
           },
           orderBy: { createdAt: 'desc' },
         });
-        amlMonitor
-          .screenTransaction(txRecord, history)
-          .catch((err) =>
-            logger.error('route.payment.aml_screen_failed', {
-              hash: result.hash,
-              error: err.message,
-            })
-          );
+        amlMonitor.screenTransaction(txRecord, history).catch((err) =>
+          logger.error('route.payment.aml_screen_failed', {
+            hash: result.hash,
+            error: err.message,
+          }),
+        );
       }
-    } catch (_) { /* non-critical: recipient notification failure doesn't fail the payment */ }
 
       const notification = {
         type: 'transaction',
@@ -356,7 +357,7 @@ router.post(
       });
       res.status(500).json({ error: 'Failed to send payment' });
     }
-  }
+  },
 );
 
 /**
@@ -522,7 +523,7 @@ router.get(
       logError(req, error);
       res.status(500).json({ error: 'Failed to retrieve fee stats' });
     }
-  }
+  },
 );
 
 /**
@@ -629,18 +630,16 @@ router.get(
       const { from, to } = req.params;
       const rate = await getRate(from, to);
       if (rate === null) {
-        return res
-          .status(503)
-          .json({
-            error: `Exchange rate unavailable for ${from}/${to}: no liquidity in orderbook`,
-          });
+        return res.status(503).json({
+          error: `Exchange rate unavailable for ${from}/${to}: no liquidity in orderbook`,
+        });
       }
       res.json({ from, to, rate });
     } catch (error) {
       logError(req, error, { from: req.params.from, to: req.params.to });
       res.status(500).json({ error: 'Failed to retrieve exchange rate' });
     }
-  }
+  },
 );
 
 // All supported pair rates in one call
@@ -829,7 +828,7 @@ router.put(
       logError(req, error, { publicKey: req.params.publicKey });
       res.status(500).json({ error: 'Failed to update account label' });
     }
-  }
+  },
 );
 
 // GET /api/stellar/account/:publicKey/settings
@@ -881,7 +880,7 @@ router.put(
       logError(req, error, { publicKey: req.params.publicKey });
       res.status(500).json({ error: 'Failed to update account settings' });
     }
-  }
+  },
 );
 
 // POST /api/stellar/account/merge - Merge account (irreversible)

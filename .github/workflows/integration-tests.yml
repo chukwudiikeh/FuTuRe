@@ -2,9 +2,9 @@ name: Integration Tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 jobs:
   integration-test:
@@ -26,37 +26,37 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-    - name: Use Node.js
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.3.0
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.3.0
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Run Prisma Migrations
-      run: npx prisma migrate deploy
-      working-directory: ./backend
-      env:
-        DATABASE_URL: postgresql://future_admin:test_password@localhost:5432/future_test
+      - name: Run Prisma Migrations
+        run: npx prisma migrate deploy
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://future_admin:test_password@localhost:5432/future_test
 
-    - name: Run Integration Tests
-      run: npm run test:integration:all
-      working-directory: ./backend
-      env:
-        DATABASE_URL: postgresql://future_admin:test_password@localhost:5432/future_test
-        NODE_ENV: test
-        JWT_SECRET: test-secret
-        STELLAR_NETWORK: testnet
-        HORIZON_URL: https://horizon-testnet.stellar.org
+      - name: Run Integration Tests
+        run: npm run test:integration:all
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://future_admin:test_password@localhost:5432/future_test
+          NODE_ENV: test
+          JWT_SECRET: test-secret
+          STELLAR_NETWORK: testnet
+          HORIZON_URL: https://horizon-testnet.stellar.org
 
-    - name: Upload Test Reports
-      uses: actions/upload-artifact@4cec3d8aa04e39d1a68cf68afc9e65e5a3b5a4f # v4.4.0
-      if: always()
-      with:
-        name: integration-test-reports
-        path: backend/test-reports/
-        retention-days: 30
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-reports
+          path: backend/test-reports/
+          retention-days: 30
